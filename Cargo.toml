@@ -37,7 +37,7 @@ screencapturekit-sys = "0.2.8"
 cocoa = "0.25.0"
 objc = "0.2.7"
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 pipewire = "0.8.0"
 dbus = "0.9.7"
 rand = "0.8.5"

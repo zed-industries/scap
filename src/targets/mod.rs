@@ -6,7 +6,7 @@ mod win;
 
 use anyhow::Result;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub(crate) mod linux;
 
 #[derive(Debug, Clone)]
@@ -20,7 +20,7 @@ pub struct Window {
     #[cfg(target_os = "macos")]
     pub raw_handle: core_graphics_helmer_fork::window::CGWindowID,
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub raw_handle: xcb::x::Window,
 }
 
@@ -35,15 +35,15 @@ pub struct Display {
     #[cfg(target_os = "macos")]
     pub raw_handle: core_graphics_helmer_fork::display::CGDisplay,
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub raw_handle: xcb::x::Window,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub width: u16,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub height: u16,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub x_offset: i16,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub y_offset: i16,
 }
 
@@ -61,7 +61,7 @@ pub fn get_all_targets() -> Result<Vec<Target>> {
     #[cfg(target_os = "windows")]
     return win::get_all_targets();
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     return linux::get_all_targets();
 }
 
@@ -72,7 +72,7 @@ pub fn get_scale_factor(target: &Target) -> f64 {
     #[cfg(target_os = "windows")]
     return win::get_scale_factor(target);
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     return 1.0;
 }
 
@@ -83,7 +83,7 @@ pub fn get_main_display() -> Result<Display> {
     #[cfg(target_os = "windows")]
     return win::get_main_display();
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     return linux::get_main_display();
 }
 
@@ -94,6 +94,6 @@ pub fn get_target_dimensions(target: &Target) -> (u64, u64) {
     #[cfg(target_os = "windows")]
     return win::get_target_dimensions(target);
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     return linux::get_target_dimensions(target);
 }

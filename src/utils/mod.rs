@@ -4,7 +4,7 @@ mod mac;
 #[cfg(target_os = "windows")]
 mod win;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod linux;
 
 /// Checks if process has permission to capture the screen
@@ -15,7 +15,7 @@ pub fn has_permission() -> bool {
     #[cfg(target_os = "windows")]
     return true;
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     return true;
 }
 
@@ -29,7 +29,7 @@ pub fn request_permission() -> bool {
     return true;
 
     // TODO: check if linux has permission system
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     return true;
 }
 
@@ -41,6 +41,6 @@ pub fn is_supported() -> bool {
     #[cfg(target_os = "windows")]
     return win::is_supported();
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     return linux::is_supported();
 }

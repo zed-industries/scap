@@ -11,7 +11,7 @@ pub mod mac;
 #[cfg(target_os = "windows")]
 mod win;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod linux;
 
 #[cfg(target_os = "macos")]
@@ -33,7 +33,7 @@ pub fn get_output_frame_size(options: &Options) -> [u32; 2] {
         win::get_output_frame_size(options)
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         // TODO: How to calculate this on Linux?
         return [0, 0];
@@ -51,7 +51,7 @@ pub struct Engine {
     #[cfg(target_os = "windows")]
     win: win::WCStream,
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     linux: linux::LinuxCapturer,
 }
 
@@ -78,7 +78,7 @@ impl Engine {
             })
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             let linux = linux::create_capturer(&options, tx)?;
             Ok(Engine {
@@ -100,7 +100,7 @@ impl Engine {
             self.win.start_capture();
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             self.linux.imp.start_capture();
         }
@@ -117,7 +117,7 @@ impl Engine {
             self.win.stop_capture();
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             self.linux.imp.stop_capture();
         }
