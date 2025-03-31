@@ -1,5 +1,7 @@
 use std::sync::mpsc;
 
+use anyhow::Result;
+
 use super::Options;
 use crate::frame::Frame;
 
@@ -54,35 +56,35 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new(options: &Options, tx: mpsc::Sender<ChannelItem>) -> Engine {
+    pub fn new(options: &Options, tx: mpsc::Sender<Result<ChannelItem>>) -> Result<Engine> {
         #[cfg(target_os = "macos")]
         {
             let error_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let mac = mac::create_capturer(options, tx, error_flag.clone());
 
-            Engine {
+            Ok(Engine {
                 mac,
                 error_flag,
                 options: (*options).clone(),
-            }
+            })
         }
 
         #[cfg(target_os = "windows")]
         {
             let win = win::create_capturer(&options, tx);
-            return Engine {
+            Ok(Engine {
                 win,
                 options: (*options).clone(),
-            };
+            })
         }
 
         #[cfg(target_os = "linux")]
         {
-            let linux = linux::create_capturer(&options, tx);
-            return Engine {
+            let linux = linux::create_capturer(&options, tx)?;
+            Ok(Engine {
                 linux,
                 options: (*options).clone(),
-            };
+            })
         }
     }
 
@@ -131,6 +133,6 @@ impl Engine {
             mac::process_sample_buffer(data.0, data.1, self.options.output_type)
         }
         #[cfg(not(target_os = "macos"))]
-        return Some(data);
+        Some(data)
     }
 }

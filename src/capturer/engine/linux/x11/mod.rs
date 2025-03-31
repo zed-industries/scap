@@ -1,12 +1,13 @@
 use std::{
     sync::{
         atomic::{AtomicU8, Ordering},
-        mpsc::Sender,
+        mpsc::{SendError, Sender},
         Arc,
     },
     thread::JoinHandle,
 };
 
+use anyhow::Context as _;
 use xcb::{x, Xid};
 
 use crate::{capturer::Options, frame::Frame, targets::linux::get_default_x_display, Target};
@@ -14,7 +15,7 @@ use crate::{capturer::Options, frame::Frame, targets::linux::get_default_x_displ
 use super::{error::LinCapError, LinuxCapturerImpl};
 
 pub struct X11Capturer {
-    capturer_join_handle: Option<JoinHandle<Result<(), xcb::Error>>>,
+    capturer_join_handle: Option<JoinHandle<()>>,
     capturer_state: Arc<AtomicU8>,
 }
 
@@ -116,7 +117,7 @@ fn draw_cursor(
     Ok(())
 }
 
-fn grab(conn: &xcb::Connection, target: &Target, show_cursor: bool) -> Result<Frame, xcb::Error> {
+fn grab(conn: &xcb::Connection, target: &Target, show_cursor: bool) -> anyhow::Result<Frame> {
     let (x, y, width, height, window, is_win) = match &target {
         Target::Window(win) => {
             let geom_cookie = conn.send_request(&x::GetGeometry {
@@ -164,7 +165,7 @@ fn grab(conn: &xcb::Connection, target: &Target, show_cursor: bool) -> Result<Fr
     Ok(Frame::BGRx(crate::frame::BGRxFrame {
         display_time: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .expect("Unix epoch is in the past")
+            .context("Unix epoch is in the past")?
             .as_nanos() as u64,
         width: width as i32,
         height: height as i32,
@@ -182,7 +183,7 @@ fn query_xfixes_version(conn: &xcb::Connection) -> Result<(), xcb::Error> {
 }
 
 impl X11Capturer {
-    pub fn new(options: &Options, tx: Sender<Frame>) -> Result<Self, LinCapError> {
+    pub fn new(options: &Options, tx: Sender<anyhow::Result<Frame>>) -> Result<Self, LinCapError> {
         let (conn, screen_num) = xcb::Connection::connect_with_xlib_display_and_extensions(
             &[xcb::Extension::RandR, xcb::Extension::XFixes],
             &[],
@@ -216,16 +217,18 @@ impl X11Capturer {
             while capturer_state_clone.load(Ordering::Acquire) == 1 {
                 let start = std::time::Instant::now();
 
-                let frame = grab(&conn, &target, show_cursor)?;
-                tx.send(frame).unwrap();
+                match tx.send(grab(&conn, &target, show_cursor)) {
+                    Ok(()) => {}
+                    Err(SendError(_)) => {
+                        log::debug!("Frame receiver was dropped.")
+                    }
+                }
 
                 let elapsed = start.elapsed();
                 if elapsed < frame_time {
                     std::thread::sleep(frame_time - start.elapsed());
                 }
             }
-
-            Ok(())
         });
 
         Ok(Self {
@@ -243,8 +246,9 @@ impl LinuxCapturerImpl for X11Capturer {
     fn stop_capture(&mut self) {
         self.capturer_state.store(2, Ordering::Release);
         if let Some(handle) = self.capturer_join_handle.take() {
-            if let Err(e) = handle.join().expect("Failed to join capturer thread") {
-                eprintln!("Error occured capturing: {e}");
+            match handle.join() {
+                Ok(()) => {}
+                Err(err) => log::error!("Failed to join X11 screen capture thread: {:?}", err),
             }
         }
     }

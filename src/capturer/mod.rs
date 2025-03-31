@@ -2,6 +2,8 @@ pub mod engine;
 
 use std::{error::Error, sync::mpsc};
 
+use anyhow::anyhow;
+
 use engine::ChannelItem;
 
 use crate::{
@@ -75,7 +77,7 @@ pub struct Options {
 /// Screen capturer class
 pub struct Capturer {
     engine: engine::Engine,
-    rx: mpsc::Receiver<ChannelItem>,
+    rx: mpsc::Receiver<anyhow::Result<ChannelItem>>,
 }
 
 #[derive(Debug)]
@@ -103,25 +105,25 @@ impl Capturer {
         since = "0.0.6",
         note = "Use `build` instead of `new` to create a new capturer instance."
     )]
-    pub fn new(options: Options) -> Capturer {
+    pub fn new(options: Options) -> anyhow::Result<Capturer> {
         let (tx, rx) = mpsc::channel();
-        let engine = engine::Engine::new(&options, tx);
+        let engine = engine::Engine::new(&options, tx)?;
 
-        Capturer { engine, rx }
+        Ok(Capturer { engine, rx })
     }
 
     /// Build a new [Capturer] instance with the provided options
-    pub fn build(options: Options) -> Result<Capturer, CapturerBuildError> {
+    pub fn build(options: Options) -> anyhow::Result<Capturer> {
         if !is_supported() {
-            return Err(CapturerBuildError::NotSupported);
+            return Err(anyhow!(CapturerBuildError::NotSupported));
         }
 
         if !has_permission() {
-            return Err(CapturerBuildError::PermissionNotGranted);
+            return Err(anyhow!(CapturerBuildError::PermissionNotGranted));
         }
 
         let (tx, rx) = mpsc::channel();
-        let engine = engine::Engine::new(&options, tx);
+        let engine = engine::Engine::new(&options, tx)?;
 
         Ok(Capturer { engine, rx })
     }
@@ -139,9 +141,9 @@ impl Capturer {
     }
 
     /// Get the next captured frame
-    pub fn get_next_frame(&self) -> Result<Frame, mpsc::RecvError> {
+    pub fn get_next_frame(&self) -> anyhow::Result<Frame> {
         loop {
-            let res = self.rx.recv()?;
+            let res = self.rx.recv()??;
 
             if let Some(frame) = self.engine.process_channel_item(res) {
                 return Ok(frame);

@@ -2,12 +2,13 @@ use std::{
     mem::size_of,
     sync::{
         atomic::{AtomicBool, AtomicU8},
-        mpsc::{sync_channel, Sender, SyncSender},
+        mpsc::{sync_channel, RecvError, SendError, Sender, SyncSender},
     },
     thread::JoinHandle,
     time::Duration,
 };
 
+use anyhow::{anyhow, Context as _, Result};
 use pipewire as pw;
 use pw::{
     context::Context,
@@ -46,7 +47,7 @@ static STREAM_STATE_CHANGED_TO_ERROR: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone)]
 struct ListenerUserData {
-    pub tx: Sender<Frame>,
+    pub tx: Sender<Result<Frame>>,
     pub format: spa::param::video::VideoInfoRaw,
 }
 
@@ -86,7 +87,7 @@ fn state_changed_callback(
 ) {
     match new {
         StreamState::Error(e) => {
-            eprintln!("pipewire: State changed to error({e})");
+            log::debug!("pipewire: State changed to error({e})");
             STREAM_STATE_CHANGED_TO_ERROR.store(true, std::sync::atomic::Ordering::Relaxed);
         }
         _ => {}
@@ -114,71 +115,85 @@ unsafe fn get_timestamp(buffer: *mut spa_buffer) -> i64 {
 
 fn process_callback(stream: &StreamRef, user_data: &mut ListenerUserData) {
     let buffer = unsafe { stream.dequeue_raw_buffer() };
-    if !buffer.is_null() {
-        'outside: {
-            let buffer = unsafe { (*buffer).buffer };
-            if buffer.is_null() {
-                break 'outside;
-            }
-            let timestamp = unsafe { get_timestamp(buffer) };
-
-            let n_datas = unsafe { (*buffer).n_datas };
-            if n_datas < 1 {
-                return;
-            }
-            let frame_size = user_data.format.size();
-            let frame_data: Vec<u8> = unsafe {
-                std::slice::from_raw_parts(
-                    (*(*buffer).datas).data as *mut u8,
-                    (*(*buffer).datas).maxsize as usize,
-                )
-                .to_vec()
-            };
-
-            if let Err(e) = match user_data.format.format() {
-                VideoFormat::RGBx => user_data.tx.send(Frame::RGBx(RGBxFrame {
-                    display_time: timestamp as u64,
-                    width: frame_size.width as i32,
-                    height: frame_size.height as i32,
-                    data: frame_data,
-                })),
-                VideoFormat::RGB => user_data.tx.send(Frame::RGB(RGBFrame {
-                    display_time: timestamp as u64,
-                    width: frame_size.width as i32,
-                    height: frame_size.height as i32,
-                    data: frame_data,
-                })),
-                VideoFormat::xBGR => user_data.tx.send(Frame::XBGR(XBGRFrame {
-                    display_time: timestamp as u64,
-                    width: frame_size.width as i32,
-                    height: frame_size.height as i32,
-                    data: frame_data,
-                })),
-                VideoFormat::BGRx => user_data.tx.send(Frame::BGRx(BGRxFrame {
-                    display_time: timestamp as u64,
-                    width: frame_size.width as i32,
-                    height: frame_size.height as i32,
-                    data: frame_data,
-                })),
-                _ => panic!("Unsupported frame format received"),
-            } {
-                eprintln!("{e}");
+    let frame_result = match process_callback_impl(buffer, user_data) {
+        Ok(None) => None,
+        Ok(Some(frame)) => Some(Ok(frame)),
+        Err(err) => Some(Err(err)),
+    };
+    if let Some(frame_result) = frame_result {
+        match user_data.tx.send(frame_result) {
+            Ok(()) => {}
+            Err(SendError(_)) => {
+                log::debug!("Frame receiver was dropped.")
             }
         }
-    } else {
-        eprintln!("Out of buffers");
     }
-
     unsafe { stream.queue_raw_buffer(buffer) };
 }
 
-// TODO: Format negotiation
-fn pipewire_capturer(
+fn process_callback_impl(
+    buffer: *mut pipewire::sys::pw_buffer,
+    user_data: &mut ListenerUserData,
+) -> Result<Option<Frame>> {
+    if buffer.is_null() {
+        return Err(anyhow!("Wayland screen capture out of buffers."));
+    }
+    let buffer = unsafe { (*buffer).buffer };
+    if buffer.is_null() {
+        // TODO: This matches the behavior of the original code by not having an error here.
+        log::error!("Buffer pointer unexpectedly null in Wayland screen capture.");
+        return Ok(None);
+    }
+
+    let timestamp = unsafe { get_timestamp(buffer) };
+
+    let n_datas = unsafe { (*buffer).n_datas };
+    if n_datas < 1 {
+        return Ok(None);
+    }
+    let frame_size = user_data.format.size();
+    let frame_data: Vec<u8> = unsafe {
+        std::slice::from_raw_parts(
+            (*(*buffer).datas).data as *mut u8,
+            (*(*buffer).datas).maxsize as usize,
+        )
+        .to_vec()
+    };
+
+    match user_data.format.format() {
+        VideoFormat::RGBx => Ok(Some(Frame::RGBx(RGBxFrame {
+            display_time: timestamp as u64,
+            width: frame_size.width as i32,
+            height: frame_size.height as i32,
+            data: frame_data,
+        }))),
+        VideoFormat::RGB => Ok(Some(Frame::RGB(RGBFrame {
+            display_time: timestamp as u64,
+            width: frame_size.width as i32,
+            height: frame_size.height as i32,
+            data: frame_data,
+        }))),
+        VideoFormat::xBGR => Ok(Some(Frame::XBGR(XBGRFrame {
+            display_time: timestamp as u64,
+            width: frame_size.width as i32,
+            height: frame_size.height as i32,
+            data: frame_data,
+        }))),
+        VideoFormat::BGRx => Ok(Some(Frame::BGRx(BGRxFrame {
+            display_time: timestamp as u64,
+            width: frame_size.width as i32,
+            height: frame_size.height as i32,
+            data: frame_data,
+        }))),
+        _ => Err(anyhow!("Unsupported frame format received")),
+    }
+}
+
+fn start_pipewire_capturer(
     options: Options,
-    tx: Sender<Frame>,
-    ready_sender: &SyncSender<bool>,
+    tx: Sender<Result<Frame>>,
     stream_id: u32,
-) -> Result<(), LinCapError> {
+) -> Result<MainLoop> {
     pw::init();
 
     let mainloop = MainLoop::new(None)?;
@@ -287,8 +302,10 @@ fn pipewire_capturer(
     .into_inner();
 
     let mut params = [
-        pw::spa::pod::Pod::from_bytes(&values).unwrap(),
-        pw::spa::pod::Pod::from_bytes(&metas_values).unwrap(),
+        pw::spa::pod::Pod::from_bytes(&values)
+            .context("Not enough space in screen capture 'values' param.")?,
+        pw::spa::pod::Pod::from_bytes(&metas_values)
+            .context("Not enough space in screen capture 'metas_values' param.")?,
     ];
 
     stream.connect(
@@ -298,7 +315,26 @@ fn pipewire_capturer(
         &mut params,
     )?;
 
-    ready_sender.send(true)?;
+    Ok(mainloop)
+}
+
+// TODO: Format negotiation
+fn pipewire_capturer(
+    options: Options,
+    tx: Sender<Result<Frame>>,
+    ready_sender: &SyncSender<Result<()>>,
+    stream_id: u32,
+) {
+    let mainloop = match start_pipewire_capturer(options, tx, stream_id) {
+        Ok(mainloop) => {
+            ready_sender.send(Ok(())).ok();
+            mainloop
+        }
+        Err(err) => {
+            ready_sender.send(Err(err)).ok();
+            return;
+        }
+    };
 
     while CAPTURER_STATE.load(std::sync::atomic::Ordering::Relaxed) == 0 {
         std::thread::sleep(Duration::from_millis(10));
@@ -313,12 +349,10 @@ fn pipewire_capturer(
     {
         pw_loop.iterate(Duration::from_millis(100));
     }
-
-    Ok(())
 }
 
 pub struct WaylandCapturer {
-    capturer_join_handle: Option<JoinHandle<Result<(), LinCapError>>>,
+    capturer_join_handle: Option<JoinHandle<()>>,
     // The pipewire stream is deleted when the connection is dropped.
     // That's why we keep it alive
     _connection: dbus::blocking::Connection,
@@ -326,35 +360,38 @@ pub struct WaylandCapturer {
 
 impl WaylandCapturer {
     // TODO: Error handling
-    pub fn new(options: &Options, tx: Sender<Frame>) -> Self {
-        let connection =
-            dbus::blocking::Connection::new_session().expect("Failed to create dbus connection");
+    pub fn new(options: &Options, tx: Sender<Result<Frame>>) -> Result<Self> {
+        let connection = dbus::blocking::Connection::new_session()
+            .context("Failed to create dbus connection")?;
         let stream_id = ScreenCastPortal::new(&connection)
             .show_cursor(options.show_cursor)
-            .expect("Unsupported cursor mode")
+            .context("Unsupported screen capture cursor display mode")?
             .create_stream()
-            .expect("Failed to get screencast stream")
+            .context("Failed to get screen capture stream")?
             .pw_node_id();
 
         // TODO: Fix this hack
         let options = options.clone();
         let (ready_sender, ready_recv) = sync_channel(1);
-        let capturer_join_handle = std::thread::spawn(move || {
-            let res = pipewire_capturer(options, tx, &ready_sender, stream_id);
-            if res.is_err() {
-                ready_sender.send(false)?;
-            }
-            res
-        });
+        let capturer_join_handle =
+            std::thread::spawn(move || pipewire_capturer(options, tx, &ready_sender, stream_id));
 
-        if !ready_recv.recv().expect("Failed to receive") {
-            panic!("Failed to setup capturer");
+        match ready_recv.recv() {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => {
+                return Err(anyhow!(err));
+            }
+            Err(RecvError) => {
+                return Err(anyhow!(
+                    "Wayland screen capture bug: stream unexpectedly dropped."
+                ));
+            }
         }
 
-        Self {
+        Ok(Self {
             capturer_join_handle: Some(capturer_join_handle),
             _connection: connection,
-        }
+        })
     }
 }
 
@@ -366,8 +403,9 @@ impl LinuxCapturerImpl for WaylandCapturer {
     fn stop_capture(&mut self) {
         CAPTURER_STATE.store(2, std::sync::atomic::Ordering::Relaxed);
         if let Some(handle) = self.capturer_join_handle.take() {
-            if let Err(e) = handle.join().expect("Failed to join capturer thread") {
-                eprintln!("Error occured capturing: {e}");
+            match handle.join() {
+                Ok(()) => {}
+                Err(err) => log::error!("Failed to join Wayland screen capture thread: {:?}", err),
             }
         }
         CAPTURER_STATE.store(0, std::sync::atomic::Ordering::Relaxed);

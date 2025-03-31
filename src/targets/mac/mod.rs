@@ -1,3 +1,4 @@
+use anyhow::Result;
 use cocoa::appkit::{NSApp, NSScreen};
 use cocoa::base::{id, nil};
 use cocoa::foundation::{NSRect, NSString, NSUInteger};
@@ -33,7 +34,7 @@ fn get_display_name(display_id: CGDirectDisplayID) -> String {
     }
 }
 
-pub fn get_all_targets() -> Vec<Target> {
+pub fn get_all_targets() -> Result<Vec<Target>> {
     let mut targets: Vec<Target> = Vec::new();
 
     let content = SCShareableContent::current();
@@ -57,7 +58,7 @@ pub fn get_all_targets() -> Vec<Target> {
     for window in content.windows {
         if window.title.is_some() {
             let id = window.window_id;
-            let title = window.title.expect("Window title not found");
+            let title = window.title.context("Window title not found")?;
             let raw_handle: CGWindowID = id;
 
             let target = Target::Window(super::Window {
@@ -72,15 +73,15 @@ pub fn get_all_targets() -> Vec<Target> {
     targets
 }
 
-pub fn get_main_display() -> Display {
+pub fn get_main_display() -> Result<Display> {
     let id = unsafe { CGMainDisplayID() };
     let title = get_display_name(id);
 
-    Display {
+    Ok(Display {
         id,
         title,
         raw_handle: CGDisplay::new(id),
-    }
+    })
 }
 
 pub fn get_scale_factor(target: &Target) -> f64 {

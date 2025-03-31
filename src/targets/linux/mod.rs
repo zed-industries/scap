@@ -2,6 +2,7 @@ use std::ffi::{CStr, CString, NulError};
 
 use super::{Display, Target};
 
+use anyhow::{anyhow, Context as _};
 use x11::xlib::{XFreeStringList, XGetTextProperty, XTextProperty, XmbTextPropertyToTextList};
 use xcb::{
     randr::{GetCrtcInfo, GetOutputInfo, GetOutputPrimary, GetScreenResources},
@@ -173,14 +174,16 @@ fn get_x11_targets() -> Result<Vec<Target>, xcb::Error> {
     Ok(targets)
 }
 
-pub fn get_all_targets() -> Vec<Target> {
+pub fn get_all_targets() -> anyhow::Result<Vec<Target>> {
     if std::env::var("WAYLAND_DISPLAY").is_ok() {
         // On Wayland, the target is selected when a Recorder is instanciated because it requires user interaction
-        Vec::new()
+        Ok(Vec::new())
     } else if std::env::var("DISPLAY").is_ok() {
-        get_x11_targets().unwrap()
+        Ok(get_x11_targets()?)
     } else {
-        panic!("Unsupported platform. Could not detect Wayland or X11 displays")
+        Err(anyhow!(
+            "Unsupported platform. Could not detect Wayland or X11 displays"
+        ))
     }
 }
 
@@ -214,17 +217,21 @@ pub(crate) fn get_default_x_display(
     })
 }
 
-pub fn get_main_display() -> Display {
+pub fn get_main_display() -> anyhow::Result<Display> {
     if std::env::var("WAYLAND_DISPLAY").is_ok() {
-        todo!()
+        Err(anyhow!(
+            "Getting main display not currently supported on Wayland."
+        ))
     } else if std::env::var("DISPLAY").is_ok() {
         let (conn, screen_num) =
             xcb::Connection::connect_with_extensions(None, &[xcb::Extension::RandR], &[]).unwrap();
         let setup = conn.get_setup();
         let screen = setup.roots().nth(screen_num as usize).unwrap();
-        get_default_x_display(&conn, screen).unwrap()
+        get_default_x_display(&conn, screen).context("Failed to get main X11 display.")
     } else {
-        panic!("Unsupported platform. Could not detect Wayland or X11 displays")
+        Err(anyhow!(
+            "Unsupported platform. Could not detect Wayland or X11 displays"
+        ))
     }
 }
 

@@ -6,6 +6,7 @@ use crate::{
 use std::cmp;
 use std::sync::mpsc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use windows_capture::capture::Context;
 use windows_capture::{
     capture::{CaptureControl, GraphicsCaptureApiHandler},
     frame::Frame as WCFrame,
@@ -14,11 +15,10 @@ use windows_capture::{
     settings::{ColorFormat, CursorCaptureSettings, DrawBorderSettings, Settings as WCSettings},
     window::Window as WCWindow,
 };
-use windows_capture::capture::Context;
 
 #[derive(Debug)]
 struct Capturer {
-    pub tx: mpsc::Sender<Frame>,
+    pub tx: mpsc::Sender<anyhow::Result<Frame>>,
     pub crop: Option<Area>,
 }
 
@@ -49,7 +49,7 @@ impl GraphicsCaptureApiHandler for Capturer {
         frame: &mut WCFrame,
         _: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
-        match &self.crop {
+        let frame = match &self.crop {
             Some(cropped_area) => {
                 // get the cropped area
                 let start_x = cropped_area.origin.x as u32;
@@ -80,9 +80,7 @@ impl GraphicsCaptureApiHandler for Capturer {
                     data: raw_frame_buffer.to_vec(),
                 };
 
-                self.tx
-                    .send(Frame::BGRA(bgr_frame))
-                    .expect("Failed to send data");
+                Frame::BGRA(bgr_frame)
             }
             None => {
                 // get raw frame buffer
@@ -100,16 +98,15 @@ impl GraphicsCaptureApiHandler for Capturer {
                     data: frame_data,
                 };
 
-                self.tx
-                    .send(Frame::BGRA(bgr_frame))
-                    .expect("Failed to send data");
+                Frame::BGRA(bgr_frame)
             }
-        }
-        Ok(())
+        };
+
+        user_data.tx.send(Ok(frame)).into()
     }
 
     fn on_closed(&mut self) -> Result<(), Self::Error> {
-        println!("Closed");
+        log::debug!("Screen capture stream closed.");
         Ok(())
     }
 }
@@ -132,11 +129,11 @@ impl WCStream {
 
 #[derive(Clone, Debug)]
 struct FlagStruct {
-    pub tx: mpsc::Sender<Frame>,
+    pub tx: mpsc::Sender<anyhow::Result<Frame>>,
     pub crop: Option<Area>,
 }
 
-pub fn create_capturer(options: &Options, tx: mpsc::Sender<Frame>) -> WCStream {
+pub fn create_capturer(options: &Options, tx: mpsc::Sender<anyhow::Result<Frame>>) -> WCStream {
     let target = options
         .target
         .clone()

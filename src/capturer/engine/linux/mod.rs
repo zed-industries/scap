@@ -1,5 +1,6 @@
 use std::{env, sync::mpsc};
 
+use anyhow::{anyhow, Result};
 use wayland::WaylandCapturer;
 use x11::X11Capturer;
 
@@ -19,25 +20,31 @@ pub struct LinuxCapturer {
     pub imp: Box<dyn LinuxCapturerImpl>,
 }
 
-type Type = mpsc::Sender<Frame>;
+type Type = mpsc::Sender<Result<Frame>>;
 
 impl LinuxCapturer {
-    pub fn new(options: &Options, tx: Type) -> Self {
+    pub fn new(options: &Options, tx: Type) -> Result<Self> {
         if env::var("WAYLAND_DISPLAY").is_ok() {
-            println!("[DEBUG] On wayland");
-            return Self {
-                imp: Box::new(WaylandCapturer::new(options, tx)),
-            };
+            log::debug!("Creating new Wayland screen capturer.");
+            Ok(Self {
+                imp: Box::new(WaylandCapturer::new(options, tx)?),
+            })
         } else if env::var("DISPLAY").is_ok() {
-            return Self {
-                imp: Box::new(X11Capturer::new(options, tx).unwrap()),
-            };
+            log::debug!("Creating new X11 screen capturer.");
+            Ok(Self {
+                imp: Box::new(X11Capturer::new(options, tx)?),
+            })
         } else {
-            panic!("Unsupported platform. Could not detect Wayland or X11 displays")
+            Err(anyhow!(
+                "Unsupported platform. Could not detect Wayland or X11 displays"
+            ))
         }
     }
 }
 
-pub fn create_capturer(options: &Options, tx: mpsc::Sender<Frame>) -> LinuxCapturer {
+pub fn create_capturer(
+    options: &Options,
+    tx: mpsc::Sender<Result<Frame>>,
+) -> Result<LinuxCapturer> {
     LinuxCapturer::new(options, tx)
 }

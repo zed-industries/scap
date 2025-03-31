@@ -518,6 +518,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "log"
+version = "0.4.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -816,9 +822,11 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 name = "scap"
 version = "0.0.8"
 dependencies = [
+ "anyhow",
  "cocoa",
  "core-graphics-helmer-fork",
  "dbus",
+ "log",
  "objc",
  "pipewire",
  "rand",

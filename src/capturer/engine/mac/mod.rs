@@ -38,7 +38,7 @@ struct ErrorHandler {
 
 impl StreamErrorHandler for ErrorHandler {
     fn on_error(&self) {
-        eprintln!("Screen capture error occurred.");
+        log::error!("Screen capture error occurred.");
         self.error_flag
             .store(true, std::sync::atomic::Ordering::Relaxed);
     }
