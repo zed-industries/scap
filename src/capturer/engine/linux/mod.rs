@@ -29,7 +29,6 @@ impl LinuxCapturer {
                 imp: Box::new(WaylandCapturer::new(options, tx)),
             };
         } else if env::var("DISPLAY").is_ok() {
-            println!("[DEBUG] On X11");
             return Self {
                 imp: Box::new(X11Capturer::new(options, tx).unwrap()),
             };
