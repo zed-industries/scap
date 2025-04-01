@@ -43,20 +43,20 @@ pub fn get_all_targets() -> Result<Vec<Target>> {
         targets.push(target);
     }
 
-    targets
+    Ok(targets)
 }
 
 pub fn get_main_display() -> Result<Display> {
     let display = Monitor::primary().context("Failed to get primary monitor")?;
     let id = display.as_raw_hmonitor() as u32;
 
-    Display {
+    Ok(Display {
         id,
         title: display
             .device_name()
             .context("Failed to get monitor name")?,
         raw_handle: HMONITOR(display.as_raw_hmonitor()),
-    }
+    })
 }
 
 // Referred to: https://github.com/tauri-apps/tao/blob/ab792dbd6c5f0a708c818b20eaff1d9a7534c7c1/src/platform_impl/windows/dpi.rs#L50

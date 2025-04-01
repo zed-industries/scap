@@ -1,12 +1,11 @@
 use crate::{
     capturer::{Area, Options, Point, Resolution, Size},
     frame::{BGRAFrame, Frame, FrameType},
-    targets::{self, get_scale_factor, Target},
+    targets::{self, Target},
 };
 use std::cmp;
 use std::sync::mpsc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use windows_capture::capture::Context;
 use windows_capture::{
     capture::{CaptureControl, GraphicsCaptureApiHandler},
     frame::Frame as WCFrame,
@@ -37,10 +36,10 @@ impl GraphicsCaptureApiHandler for Capturer {
     type Flags = FlagStruct;
     type Error = Box<dyn std::error::Error + Send + Sync>;
 
-    fn new(context: Context<Self::Flags>) -> Result<Self, Self::Error> {
+    fn new(context: Self::Flags) -> Result<Self, Self::Error> {
         Ok(Self {
-            tx: context.flags.tx,
-            crop: context.flags.crop,
+            tx: context.tx,
+            crop: context.crop,
         })
     }
 
@@ -63,7 +62,7 @@ impl GraphicsCaptureApiHandler for Capturer {
                     .expect("Failed to crop buffer");
 
                 // get raw frame buffer
-                let raw_frame_buffer = match cropped_buffer.as_nopadding_buffer() {
+                let raw_frame_buffer = match cropped_buffer.as_raw_nopadding_buffer() {
                     Ok(buffer) => buffer,
                     Err(_) => return Err(("Failed to get raw buffer").into()),
                 };
@@ -102,7 +101,7 @@ impl GraphicsCaptureApiHandler for Capturer {
             }
         };
 
-        user_data.tx.send(Ok(frame)).into()
+        Ok(self.tx.send(Ok(frame))?)
     }
 
     fn on_closed(&mut self) -> Result<(), Self::Error> {
@@ -134,10 +133,9 @@ struct FlagStruct {
 }
 
 pub fn create_capturer(options: &Options, tx: mpsc::Sender<anyhow::Result<Frame>>) -> WCStream {
-    let target = options
-        .target
-        .clone()
-        .unwrap_or_else(|| Target::Display(targets::get_main_display()));
+    let target = options.target.clone().unwrap_or_else(|| {
+        Target::Display(targets::get_main_display().expect("Failed to get main display"))
+    });
 
     let color_format = match options.output_type {
         FrameType::BGRAFrame => ColorFormat::Bgra8,
@@ -179,11 +177,6 @@ pub fn create_capturer(options: &Options, tx: mpsc::Sender<anyhow::Result<Frame>
 }
 
 pub fn get_output_frame_size(options: &Options) -> [u32; 2] {
-    let target = options
-        .target
-        .clone()
-        .unwrap_or_else(|| Target::Display(targets::get_main_display()));
-
     let crop_area = get_crop_area(options);
 
     let mut output_width = (crop_area.size.width) as u32;
@@ -213,10 +206,9 @@ fn get_absolute_value(value: f64, scale_factor: f64) -> f64 {
 }
 
 pub fn get_crop_area(options: &Options) -> Area {
-    let target = options
-        .target
-        .clone()
-        .unwrap_or_else(|| Target::Display(targets::get_main_display()));
+    let target = options.target.clone().unwrap_or_else(|| {
+        Target::Display(targets::get_main_display().expect("Failed to get main display"))
+    });
 
     let (width, height) = targets::get_target_dimensions(&target);
 
