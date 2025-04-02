@@ -22,6 +22,8 @@ pub fn get_all_targets() -> Result<Vec<Target>> {
             id,
             title,
             raw_handle: HMONITOR(display.as_raw_hmonitor()),
+            width: display.width()? as u16,
+            height: display.height()? as u16,
         });
         targets.push(target);
     }
@@ -56,6 +58,8 @@ pub fn get_main_display() -> Result<Display> {
             .device_name()
             .context("Failed to get monitor name")?,
         raw_handle: HMONITOR(display.as_raw_hmonitor()),
+        width: display.width()? as u16,
+        height: display.height()? as u16,
     })
 }
 
