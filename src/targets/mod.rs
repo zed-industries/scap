@@ -54,7 +54,9 @@ pub enum Target {
 }
 
 // Both `HWND` and `HMONITOR` are `Send` and `Sync`, so we can safely implement these traits for `Target`
+#[cfg(target_os = "windows")]
 unsafe impl Send for Target {}
+#[cfg(target_os = "windows")]
 unsafe impl Sync for Target {}
 
 /// Returns a list of targets that can be captured
