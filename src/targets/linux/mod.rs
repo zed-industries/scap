@@ -175,15 +175,21 @@ fn get_x11_targets() -> Result<Vec<Target>, xcb::Error> {
 }
 
 pub fn get_all_targets() -> anyhow::Result<Vec<Target>> {
+    #[cfg(feature = "wayland")]
     if std::env::var("WAYLAND_DISPLAY").is_ok() {
         // On Wayland, the target is selected when a Recorder is instanciated because it requires user interaction
-        Ok(Vec::new())
-    } else if std::env::var("DISPLAY").is_ok() {
+        return Ok(Vec::new());
+    }
+
+    if std::env::var("DISPLAY").is_ok() {
         Ok(get_x11_targets()?)
     } else {
-        Err(anyhow!(
-            "Unsupported platform. Could not detect Wayland or X11 displays"
-        ))
+        #[cfg(feature = "wayland")]
+        let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
+        #[cfg(not(feature = "wayland"))]
+        let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
+        
+        Err(anyhow!(error_msg))
     }
 }
 
@@ -218,20 +224,26 @@ pub(crate) fn get_default_x_display(
 }
 
 pub fn get_main_display() -> anyhow::Result<Display> {
+    #[cfg(feature = "wayland")]
     if std::env::var("WAYLAND_DISPLAY").is_ok() {
-        Err(anyhow!(
+        return Err(anyhow!(
             "Getting main display not currently supported on Wayland."
-        ))
-    } else if std::env::var("DISPLAY").is_ok() {
+        ));
+    }
+
+    if std::env::var("DISPLAY").is_ok() {
         let (conn, screen_num) =
             xcb::Connection::connect_with_extensions(None, &[xcb::Extension::RandR], &[]).unwrap();
         let setup = conn.get_setup();
         let screen = setup.roots().nth(screen_num as usize).unwrap();
         get_default_x_display(&conn, screen).context("Failed to get main X11 display.")
     } else {
-        Err(anyhow!(
-            "Unsupported platform. Could not detect Wayland or X11 displays"
-        ))
+        #[cfg(feature = "wayland")]
+        let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
+        #[cfg(not(feature = "wayland"))]
+        let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
+        
+        Err(anyhow!(error_msg))
     }
 }
 

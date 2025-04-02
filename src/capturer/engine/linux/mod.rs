@@ -1,15 +1,18 @@
 use std::{env, sync::mpsc};
 
 use anyhow::{anyhow, Result};
-use wayland::WaylandCapturer;
 use x11::X11Capturer;
 
 use crate::{capturer::Options, frame::Frame};
 
 mod error;
 
+#[cfg(feature = "wayland")]
 mod wayland;
 mod x11;
+
+#[cfg(feature = "wayland")]
+use wayland::WaylandCapturer;
 
 pub trait LinuxCapturerImpl {
     fn start_capture(&mut self);
@@ -24,20 +27,26 @@ type Type = mpsc::Sender<Result<Frame>>;
 
 impl LinuxCapturer {
     pub fn new(options: &Options, tx: Type) -> Result<Self> {
+        #[cfg(feature = "wayland")]
         if env::var("WAYLAND_DISPLAY").is_ok() {
             log::debug!("Creating new Wayland screen capturer.");
-            Ok(Self {
+            return Ok(Self {
                 imp: Box::new(WaylandCapturer::new(options, tx)?),
-            })
-        } else if env::var("DISPLAY").is_ok() {
+            });
+        }
+
+        if env::var("DISPLAY").is_ok() {
             log::debug!("Creating new X11 screen capturer.");
             Ok(Self {
                 imp: Box::new(X11Capturer::new(options, tx)?),
             })
         } else {
-            Err(anyhow!(
-                "Unsupported platform. Could not detect Wayland or X11 displays"
-            ))
+            #[cfg(feature = "wayland")]
+            let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
+            #[cfg(not(feature = "wayland"))]
+            let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
+            
+            Err(anyhow!(error_msg))
         }
     }
 }

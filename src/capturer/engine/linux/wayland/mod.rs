@@ -37,7 +37,7 @@ use crate::{
 
 use self::portal::ScreenCastPortal;
 
-use super::{error::LinCapError, LinuxCapturerImpl};
+use super::LinuxCapturerImpl;
 
 mod portal;
 

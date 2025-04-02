@@ -4,6 +4,7 @@ use std::{
     sync::PoisonError,
 };
 
+#[cfg(feature = "wayland")]
 use pipewire::spa::pod::serialize::GenError;
 
 #[derive(Debug)]
@@ -25,6 +26,7 @@ impl Display for LinCapError {
     }
 }
 
+#[cfg(feature = "wayland")]
 impl From<pipewire::Error> for LinCapError {
     fn from(e: pipewire::Error) -> Self {
         Self::new(e.to_string())
@@ -37,12 +39,14 @@ impl From<std::sync::mpsc::SendError<bool>> for LinCapError {
     }
 }
 
+#[cfg(feature = "wayland")]
 impl From<GenError> for LinCapError {
     fn from(e: GenError) -> Self {
         Self::new(e.to_string())
     }
 }
 
+#[cfg(feature = "wayland")]
 impl From<dbus::Error> for LinCapError {
     fn from(e: dbus::Error) -> Self {
         Self::new(e.to_string())
