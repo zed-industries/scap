@@ -37,9 +37,9 @@ pub struct Display {
 
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub raw_handle: xcb::x::Window,
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
     pub width: u16,
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
     pub height: u16,
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub x_offset: i16,
@@ -52,6 +52,10 @@ pub enum Target {
     Window(Window),
     Display(Display),
 }
+
+// Both `HWND` and `HMONITOR` are `Send` and `Sync`, so we can safely implement these traits for `Target`
+unsafe impl Send for Target {}
+unsafe impl Sync for Target {}
 
 /// Returns a list of targets that can be captured
 pub fn get_all_targets() -> Result<Vec<Target>> {
