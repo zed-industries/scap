@@ -1,4 +1,4 @@
-use std::ffi::{CStr, CString, NulError};
+use std::ffi::{c_char, CStr, CString, NulError};
 
 use super::{Display, Target};
 
@@ -70,7 +70,7 @@ fn decode_compound_text(
         format: 8,
         nitems: text_prop.nitems,
     };
-    let mut list: *mut *mut i8 = std::ptr::null_mut();
+    let mut list: *mut *mut c_char = std::ptr::null_mut();
     let mut count: i32 = 0;
     let result = unsafe { XmbTextPropertyToTextList(display, &mut xname, &mut list, &mut count) };
     if result < 1 || list.is_null() || count < 1 {
@@ -188,7 +188,7 @@ pub fn get_all_targets() -> anyhow::Result<Vec<Target>> {
         let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
         #[cfg(not(feature = "wayland"))]
         let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
-        
+
         Err(anyhow!(error_msg))
     }
 }
@@ -242,7 +242,7 @@ pub fn get_main_display() -> anyhow::Result<Display> {
         let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
         #[cfg(not(feature = "wayland"))]
         let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
-        
+
         Err(anyhow!(error_msg))
     }
 }
