@@ -1,15 +1,25 @@
+#[cfg(not(any(feature = "wayland", feature = "x11")))]
+compile_error!("'wayland' or 'x11' feature must be enabled.");
+
+#[cfg(feature = "x11")]
 use std::ffi::{c_char, CStr, CString, NulError};
 
 use super::{Display, Target};
 
-use anyhow::{anyhow, Context as _};
+use anyhow::anyhow;
+#[cfg(feature = "x11")]
+use anyhow::Context as _;
+
+#[cfg(feature = "x11")]
 use x11::xlib::{XFreeStringList, XGetTextProperty, XTextProperty, XmbTextPropertyToTextList};
+#[cfg(feature = "x11")]
 use xcb::{
     randr::{GetCrtcInfo, GetOutputInfo, GetOutputPrimary, GetScreenResources},
     x::{self, GetPropertyReply, Screen},
     Xid,
 };
 
+#[cfg(feature = "x11")]
 fn get_atom(conn: &xcb::Connection, atom_name: &str) -> Result<x::Atom, xcb::Error> {
     let cookie = conn.send_request(&x::InternAtom {
         only_if_exists: true,
@@ -18,6 +28,7 @@ fn get_atom(conn: &xcb::Connection, atom_name: &str) -> Result<x::Atom, xcb::Err
     Ok(conn.wait_for_reply(cookie)?.atom())
 }
 
+#[cfg(feature = "x11")]
 fn get_property(
     conn: &xcb::Connection,
     win: x::Window,
@@ -36,6 +47,7 @@ fn get_property(
     Ok(conn.wait_for_reply(cookie)?)
 }
 
+#[cfg(feature = "x11")]
 fn decode_compound_text(
     conn: &xcb::Connection,
     value: &[u8],
@@ -82,6 +94,7 @@ fn decode_compound_text(
     }
 }
 
+#[cfg(feature = "x11")]
 fn get_x11_targets() -> Result<Vec<Target>, xcb::Error> {
     let (conn, _screen_num) =
         xcb::Connection::connect_with_xlib_display_and_extensions(&[xcb::Extension::RandR], &[])?;
@@ -181,18 +194,22 @@ pub fn get_all_targets() -> anyhow::Result<Vec<Target>> {
         return Ok(Vec::new());
     }
 
+    #[cfg(feature = "x11")]
     if std::env::var("DISPLAY").is_ok() {
-        Ok(get_x11_targets()?)
-    } else {
-        #[cfg(feature = "wayland")]
-        let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
-        #[cfg(not(feature = "wayland"))]
-        let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
-
-        Err(anyhow!(error_msg))
+        return Ok(get_x11_targets()?);
     }
+
+    #[cfg(all(feature = "wayland", feature = "x11"))]
+    let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
+    #[cfg(all(not(feature = "wayland"), feature = "x11"))]
+    let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
+    #[cfg(all(feature = "wayland", not(feature = "x11")))]
+    let error_msg = "Unsupported platform. Could not detect Wayland display. Enable the 'x11' feature for X11 support.";
+
+    Err(anyhow!(error_msg))
 }
 
+#[cfg(feature = "x11")]
 pub(crate) fn get_default_x_display(
     conn: &xcb::Connection,
     screen: &Screen,
@@ -231,20 +248,23 @@ pub fn get_main_display() -> anyhow::Result<Display> {
         ));
     }
 
+    #[cfg(feature = "x11")]
     if std::env::var("DISPLAY").is_ok() {
         let (conn, screen_num) =
             xcb::Connection::connect_with_extensions(None, &[xcb::Extension::RandR], &[]).unwrap();
         let setup = conn.get_setup();
         let screen = setup.roots().nth(screen_num as usize).unwrap();
-        get_default_x_display(&conn, screen).context("Failed to get main X11 display.")
-    } else {
-        #[cfg(feature = "wayland")]
-        let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
-        #[cfg(not(feature = "wayland"))]
-        let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
-
-        Err(anyhow!(error_msg))
+        return get_default_x_display(&conn, screen).context("Failed to get main X11 display.");
     }
+
+    #[cfg(all(feature = "wayland", feature = "x11"))]
+    let error_msg = "Unsupported platform. Could not detect Wayland or X11 displays";
+    #[cfg(all(not(feature = "wayland"), feature = "x11"))]
+    let error_msg = "Unsupported platform. Could not detect X11 display. Enable the 'wayland' feature for Wayland support.";
+    #[cfg(all(feature = "wayland", not(feature = "x11")))]
+    let error_msg = "Unsupported platform. Could not detect Wayland display. Enable the 'x11' feature for X11 support.";
+
+    Err(anyhow!(error_msg))
 }
 
 pub fn get_target_dimensions(target: &Target) -> (u64, u64) {
