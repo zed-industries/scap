@@ -16,8 +16,9 @@ keywords = ["screen", "recording", "video", "capture", "media"]
 categories = ["graphics", "multimedia", "multimedia::video"]
 
 [features]
-x11 = ["dep:xcb", "dep:x11"]
+default = ["wayland", "x11"]
 wayland = ["dep:pipewire", "dep:dbus"]
+x11 = ["dep:xcb", "dep:x11"]
 
 [dependencies]
 anyhow = "1.0.86"
