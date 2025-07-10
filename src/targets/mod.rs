@@ -20,7 +20,7 @@ pub struct Window {
     #[cfg(target_os = "macos")]
     pub raw_handle: core_graphics_helmer_fork::window::CGWindowID,
 
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(all(any(target_os = "linux", target_os = "freebsd"), feature = "x11" ))]
     pub raw_handle: xcb::x::Window,
 }
 
@@ -35,7 +35,7 @@ pub struct Display {
     #[cfg(target_os = "macos")]
     pub raw_handle: core_graphics_helmer_fork::display::CGDisplay,
 
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(all(any(target_os = "linux", target_os = "freebsd"), feature = "x11" ))]
     pub raw_handle: xcb::x::Window,
     #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "windows"))]
     pub width: u16,

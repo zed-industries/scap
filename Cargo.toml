@@ -16,8 +16,9 @@ keywords = ["screen", "recording", "video", "capture", "media"]
 categories = ["graphics", "multimedia", "multimedia::video"]
 
 [features]
-default = ["wayland"]
+default = ["wayland", "x11"]
 wayland = ["dep:pipewire", "dep:dbus"]
+x11 = ["dep:xcb", "dep:x11"]
 
 [dependencies]
 anyhow = "1.0.86"
@@ -43,7 +44,7 @@ objc = "0.2.7"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 rand = "0.8.5"
-xcb = { version = "1.4.0", features = ["randr", "xlib_xcb", "xfixes"] }
-x11 = "2.21.0"
+xcb = { version = "1.4.0", features = ["randr", "xlib_xcb", "xfixes"], optional = true }
+x11 = { version ="2.21.0", optional = true }
 pipewire = { version = "0.8.0", optional = true }
 dbus = { version = "0.9.7", optional = true }
