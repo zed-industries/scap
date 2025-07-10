@@ -1,6 +1,6 @@
 use crate::{
     capturer::{Area, Options, Point, Resolution, Size},
-    frame::{BGRAFrame, Frame, FrameType},
+    frame::{BGRAFrame, Frame, FrameType, RGB8Frame, RGBxFrame},
     targets::{self, Target},
 };
 use std::cmp;
@@ -48,7 +48,8 @@ impl GraphicsCaptureApiHandler for Capturer {
         frame: &mut WCFrame,
         _: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
-        let frame = match &self.crop {
+        let color_format = frame.color_format();
+        let (width, height, data) = match &self.crop {
             Some(cropped_area) => {
                 // get the cropped area
                 let start_x = cropped_area.origin.x as u32;
@@ -67,38 +68,41 @@ impl GraphicsCaptureApiHandler for Capturer {
                     Err(_) => return Err(("Failed to get raw buffer").into()),
                 };
 
-                let current_time = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Failed to get current time")
-                    .as_nanos() as u64;
-
-                let bgr_frame = BGRAFrame {
-                    display_time: current_time,
-                    width: cropped_area.size.width as i32,
-                    height: cropped_area.size.height as i32,
-                    data: raw_frame_buffer.to_vec(),
-                };
-
-                Frame::BGRA(bgr_frame)
+                (
+                    cropped_area.size.width as i32,
+                    cropped_area.size.height as i32,
+                    raw_frame_buffer.to_vec(),
+                )
             }
             None => {
                 // get raw frame buffer
+                let width = frame.width() as i32;
+                let height = frame.height() as i32;
                 let mut frame_buffer = frame.buffer().unwrap();
                 let raw_frame_buffer = frame_buffer.as_raw_buffer();
-                let frame_data = raw_frame_buffer.to_vec();
-                let current_time = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Failed to get current time")
-                    .as_nanos() as u64;
-                let bgr_frame = BGRAFrame {
-                    display_time: current_time,
-                    width: frame.width() as i32,
-                    height: frame.height() as i32,
-                    data: frame_data,
-                };
-
-                Frame::BGRA(bgr_frame)
+                (width, height, raw_frame_buffer.to_vec())
             }
+        };
+
+        let display_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get current time")
+            .as_nanos() as u64;
+
+        let frame = match color_format {
+            ColorFormat::Rgba16F => return Err("Rgba16F is not yet supported".into()),
+            ColorFormat::Rgba8 => Frame::RGBx(RGBxFrame {
+                display_time,
+                width,
+                height,
+                data,
+            }),
+            ColorFormat::Bgra8 => Frame::BGRA(BGRAFrame {
+                display_time,
+                width,
+                height,
+                data,
+            }),
         };
 
         Ok(self.tx.send(Ok(frame))?)
