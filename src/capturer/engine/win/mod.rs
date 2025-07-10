@@ -1,6 +1,6 @@
 use crate::{
     capturer::{Area, Options, Point, Resolution, Size},
-    frame::{BGRAFrame, Frame, FrameType, RGB8Frame, RGBxFrame},
+    frame::{BGRAFrame, Frame, FrameType, RGBxFrame},
     targets::{self, Target},
 };
 use std::cmp;
