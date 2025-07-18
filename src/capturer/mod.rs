@@ -159,6 +159,10 @@ impl Capturer {
     pub fn raw(&self) -> RawCapturer {
         RawCapturer { capturer: self }
     }
+
+    pub fn target(&self) -> Option<&Target> {
+        self.engine.target()
+    }
 }
 
 pub struct RawCapturer<'a> {

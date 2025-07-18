@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use anyhow::Result;
 
 use super::Options;
-use crate::frame::Frame;
+use crate::{frame::Frame, Target};
 
 #[cfg(target_os = "macos")]
 pub mod mac;
@@ -42,7 +42,7 @@ pub fn get_output_frame_size(options: &Options) -> [u32; 2] {
 
 pub struct Engine {
     options: Options,
-
+    target: Option<Target>,
     #[cfg(target_os = "macos")]
     mac: screencapturekit::sc_stream::SCStream,
     #[cfg(target_os = "macos")]
@@ -60,30 +60,35 @@ impl Engine {
         #[cfg(target_os = "macos")]
         {
             let error_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let mac = mac::create_capturer(options, tx, error_flag.clone());
+            let (mac, target) = mac::create_capturer(options, tx, error_flag.clone());
 
             Ok(Engine {
                 mac,
                 error_flag,
                 options: (*options).clone(),
+                target: Some(target),
             })
         }
 
         #[cfg(target_os = "windows")]
         {
-            let win = win::create_capturer(&options, tx);
+            let (win, target) = win::create_capturer(&options, tx);
             Ok(Engine {
                 win,
                 options: (*options).clone(),
+                target: Some(target),
             })
         }
 
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
+            use linux::LinuxCapturerImpl;
             let linux = linux::create_capturer(&options, tx)?;
+            let target = linux.imp.target().cloned();
             Ok(Engine {
                 linux,
                 options: (*options).clone(),
+                target,
             })
         }
     }
@@ -134,5 +139,8 @@ impl Engine {
         }
         #[cfg(not(target_os = "macos"))]
         Some(data)
+    }
+    pub fn target(&self) -> Option<&Target> {
+        self.target.as_ref()
     }
 }

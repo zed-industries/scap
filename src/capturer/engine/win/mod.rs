@@ -136,7 +136,7 @@ struct FlagStruct {
     pub crop: Option<Area>,
 }
 
-pub fn create_capturer(options: &Options, tx: mpsc::Sender<anyhow::Result<Frame>>) -> WCStream {
+pub fn create_capturer(options: &Options, tx: mpsc::Sender<anyhow::Result<Frame>>) -> (WCStream, Target) {
     let target = options.target.clone().unwrap_or_else(|| {
         Target::Display(targets::get_main_display().expect("Failed to get main display"))
     });
@@ -151,7 +151,7 @@ pub fn create_capturer(options: &Options, tx: mpsc::Sender<anyhow::Result<Frame>
         false => CursorCaptureSettings::WithoutCursor,
     };
 
-    let settings = match target {
+    let settings = match target.clone() {
         Target::Display(display) => Settings::Display(WCSettings::new(
             WCMonitor::from_raw_hmonitor(display.raw_handle.0),
             show_cursor,
@@ -174,10 +174,10 @@ pub fn create_capturer(options: &Options, tx: mpsc::Sender<anyhow::Result<Frame>
         )),
     };
 
-    WCStream {
+    (WCStream {
         settings,
         capture_control: None,
-    }
+    }, target)
 }
 
 pub fn get_output_frame_size(options: &Options) -> [u32; 2] {

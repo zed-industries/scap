@@ -31,6 +31,7 @@ use pw::{
 };
 
 use crate::{
+    Target,
     capturer::Options,
     frame::{BGRxFrame, Frame, RGBFrame, RGBxFrame, XBGRFrame},
 };

@@ -55,9 +55,14 @@ pub enum Target {
 
 // Both `HWND` and `HMONITOR` are `Send` and `Sync`, so we can safely implement these traits for `Target`
 #[cfg(target_os = "windows")]
-unsafe impl Send for Target {}
+unsafe impl Send for Display {}
 #[cfg(target_os = "windows")]
-unsafe impl Sync for Target {}
+unsafe impl Sync for Display {}
+
+#[cfg(target_os = "windows")]
+unsafe impl Send for Window {}
+#[cfg(target_os = "windows")]
+unsafe impl Sync for Window {}
 
 /// Returns a list of targets that can be captured
 pub fn get_all_targets() -> Result<Vec<Target>> {

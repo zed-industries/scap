@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 #[cfg(feature = "x11")]
 use x11::X11Capturer;
 
-use crate::{capturer::Options, frame::Frame};
+use crate::{capturer::Options, frame::Frame, Target};
 
 mod error;
 
@@ -24,6 +24,9 @@ use wayland::WaylandCapturer;
 pub trait LinuxCapturerImpl {
     fn start_capture(&mut self);
     fn stop_capture(&mut self);
+    fn target(&self) -> Option<&Target> {
+        None
+    }
 }
 
 pub struct LinuxCapturer {

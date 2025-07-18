@@ -17,6 +17,7 @@ use super::{error::LinCapError, LinuxCapturerImpl};
 pub struct X11Capturer {
     capturer_join_handle: Option<JoinHandle<()>>,
     capturer_state: Arc<AtomicU8>,
+    target: Target,
 }
 
 fn draw_cursor(
@@ -208,6 +209,7 @@ impl X11Capturer {
         let capturer_state = Arc::new(AtomicU8::new(0));
         let capturer_state_clone = Arc::clone(&capturer_state);
 
+        let target_clone = target.clone();
         let jh = std::thread::spawn(move || {
             while capturer_state_clone.load(Ordering::Acquire) == 0 {
                 std::thread::sleep(std::time::Duration::from_millis(10));
@@ -217,7 +219,7 @@ impl X11Capturer {
             while capturer_state_clone.load(Ordering::Acquire) == 1 {
                 let start = std::time::Instant::now();
 
-                match tx.send(grab(&conn, &target, show_cursor)) {
+                match tx.send(grab(&conn, &target_clone, show_cursor)) {
                     Ok(()) => {}
                     Err(SendError(_)) => {
                         log::debug!("Frame receiver was dropped.")
@@ -234,6 +236,7 @@ impl X11Capturer {
         Ok(Self {
             capturer_state,
             capturer_join_handle: Some(jh),
+            target,
         })
     }
 }
@@ -251,5 +254,8 @@ impl LinuxCapturerImpl for X11Capturer {
                 Err(err) => log::error!("Failed to join X11 screen capture thread: {:?}", err),
             }
         }
+    }
+    fn target(&self) -> Option<&Target> {
+        Some(&self.target)
     }
 }

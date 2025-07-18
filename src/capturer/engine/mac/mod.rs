@@ -64,7 +64,7 @@ pub fn create_capturer(
     options: &Options,
     tx: mpsc::Sender<ChannelItem>,
     error_flag: Arc<AtomicBool>,
-) -> SCStream {
+) -> (SCStream, Target) {
     // If no target is specified, capture the main display
     let target = options
         .target
@@ -160,7 +160,7 @@ pub fn create_capturer(
     let mut stream = SCStream::new(filter, stream_config, ErrorHandler { error_flag });
     stream.add_output(Capturer::new(tx), SCStreamOutputType::Screen);
 
-    stream
+    (stream, target)
 }
 
 pub fn get_output_frame_size(options: &Options) -> [u32; 2] {
