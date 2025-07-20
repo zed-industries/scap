@@ -14,9 +14,7 @@ pub fn get_all_targets() -> Result<Vec<Target>> {
     let displays = Monitor::enumerate().context("Failed to enumerate monitors")?;
     for display in displays {
         let id = display.as_raw_hmonitor() as u32;
-        let title = display
-            .device_name()
-            .context("Failed to get monitor name")?;
+        let title = monitor_title(&display).context("Failed to get monitor name")?;
 
         let target = Target::Display(super::Display {
             id,
@@ -54,15 +52,19 @@ pub fn get_main_display() -> Result<Display> {
 
     Ok(Display {
         id,
-        title: display
-            .device_name()
-            .context("Failed to get monitor name")?,
+        title: monitor_title(display).context("Failed to get monitor name")?,
         raw_handle: HMONITOR(display.as_raw_hmonitor()),
         width: display.width()? as u16,
         height: display.height()? as u16,
     })
 }
 
+fn monitor_title(monitor: &Monitor) -> Result<String> {
+    monitor
+        .name()
+        .or_else(|_| monitor.device_string())
+        .or_else(|_| monitor.device_name())
+}
 // Referred to: https://github.com/tauri-apps/tao/blob/ab792dbd6c5f0a708c818b20eaff1d9a7534c7c1/src/platform_impl/windows/dpi.rs#L50
 pub fn get_scale_factor(target: &Target) -> f64 {
     const BASE_DPI: u32 = 96;
