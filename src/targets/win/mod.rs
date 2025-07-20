@@ -5,7 +5,10 @@ use windows::Win32::{
     Foundation::{HWND, RECT},
     Graphics::Gdi::HMONITOR,
 };
-use windows_capture::{monitor::Monitor, window::Window};
+use windows_capture::{
+    monitor::{Error as MonitorError, Monitor},
+    window::Window,
+};
 
 pub fn get_all_targets() -> Result<Vec<Target>> {
     let mut targets: Vec<Target> = Vec::new();
@@ -59,12 +62,13 @@ pub fn get_main_display() -> Result<Display> {
     })
 }
 
-fn monitor_title(monitor: &Monitor) -> Result<String> {
+fn monitor_title(monitor: &Monitor) -> Result<String, MonitorError> {
     monitor
         .name()
         .or_else(|_| monitor.device_string())
         .or_else(|_| monitor.device_name())
 }
+
 // Referred to: https://github.com/tauri-apps/tao/blob/ab792dbd6c5f0a708c818b20eaff1d9a7534c7c1/src/platform_impl/windows/dpi.rs#L50
 pub fn get_scale_factor(target: &Target) -> f64 {
     const BASE_DPI: u32 = 96;
