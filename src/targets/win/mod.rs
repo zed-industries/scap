@@ -55,7 +55,7 @@ pub fn get_main_display() -> Result<Display> {
 
     Ok(Display {
         id,
-        title: monitor_title(display).context("Failed to get monitor name")?,
+        title: monitor_title(&display).context("Failed to get monitor name")?,
         raw_handle: HMONITOR(display.as_raw_hmonitor()),
         width: display.width()? as u16,
         height: display.height()? as u16,
