@@ -228,7 +228,7 @@ impl X11Capturer {
 
                 let elapsed = start.elapsed();
                 if elapsed < frame_time {
-                    std::thread::sleep(frame_time - start.elapsed());
+                    std::thread::sleep(frame_time - elapsed);
                 }
             }
         });
