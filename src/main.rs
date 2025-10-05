@@ -1,32 +1,31 @@
 // This program is just a testing application
 // Refer to `lib.rs` for the library source code
 
-use scap::{
-    capturer::{Area, Capturer, Options, Point, Size},
-    frame::Frame
-    ,
-};
 use std::process;
+use zed_scap::{
+    capturer::{Area, Capturer, Options, Point, Size},
+    frame::Frame,
+};
 
 fn main() {
     // Check if the platform is supported
-    if !scap::is_supported() {
+    if !zed_scap::is_supported() {
         println!("❌ Platform not supported");
         return;
     }
 
     // Check if we have permission to capture screen
     // If we don't, request it.
-    if !scap::has_permission() {
+    if !zed_scap::has_permission() {
         println!("❌ Permission not granted. Requesting permission...");
-        if !scap::request_permission() {
+        if !zed_scap::request_permission() {
             println!("❌ Permission denied");
             return;
         }
     }
 
     // // Get recording targets
-    // let targets = scap::get_all_targets();
+    // let targets = zed_scap::get_all_targets();
 
     // Create Options
     let options = Options {
@@ -34,8 +33,8 @@ fn main() {
         show_cursor: true,
         show_highlight: true,
         excluded_targets: None,
-        output_type: scap::frame::FrameType::BGRAFrame,
-        output_resolution: scap::capturer::Resolution::_720p,
+        output_type: zed_scap::frame::FrameType::BGRAFrame,
+        output_resolution: zed_scap::capturer::Resolution::_720p,
         crop_area: Some(Area {
             origin: Point { x: 0.0, y: 0.0 },
             size: Size {

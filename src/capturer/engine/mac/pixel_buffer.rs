@@ -183,9 +183,10 @@ impl RawCapturer<'_> {
                 Ok(v) => Ok(v),
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(mpsc::RecvTimeoutError::Disconnected) => Err(mpsc::RecvError),
-            }?;
+            }?
+            .ok();
 
-            if let Some(frame) = PixelBuffer::new(res) {
+            if let Some(frame) = PixelBuffer::new(res.unwrap()) {
                 return Ok(frame);
             }
         }

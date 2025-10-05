@@ -1,4 +1,6 @@
-use anyhow::Result;
+#![allow(unexpected_cfgs)]
+
+use anyhow::{Context as _, Result};
 use cocoa::appkit::{NSApp, NSScreen};
 use cocoa::base::{id, nil};
 use cocoa::foundation::{NSRect, NSString, NSUInteger};
@@ -70,7 +72,7 @@ pub fn get_all_targets() -> Result<Vec<Target>> {
         }
     }
 
-    targets
+    Ok(targets)
 }
 
 pub fn get_main_display() -> Result<Display> {

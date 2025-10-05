@@ -45,35 +45,35 @@ impl StreamErrorHandler for ErrorHandler {
 }
 
 pub struct Capturer {
-    pub tx: mpsc::Sender<ChannelItem>,
+    pub tx: mpsc::Sender<anyhow::Result<ChannelItem>>,
 }
 
 impl Capturer {
-    pub fn new(tx: mpsc::Sender<ChannelItem>) -> Self {
+    pub fn new(tx: mpsc::Sender<anyhow::Result<ChannelItem>>) -> Self {
         Capturer { tx }
     }
 }
 
 impl StreamOutput for Capturer {
     fn did_output_sample_buffer(&self, sample: CMSampleBuffer, of_type: SCStreamOutputType) {
-        self.tx.send((sample, of_type)).unwrap_or(());
+        self.tx.send(Ok((sample, of_type))).unwrap_or(());
     }
 }
 
 pub fn create_capturer(
     options: &Options,
-    tx: mpsc::Sender<ChannelItem>,
+    tx: mpsc::Sender<anyhow::Result<ChannelItem>>,
     error_flag: Arc<AtomicBool>,
 ) -> (SCStream, Target) {
     // If no target is specified, capture the main display
     let target = options
         .target
         .clone()
-        .unwrap_or_else(|| Target::Display(targets::get_main_display()));
+        .unwrap_or_else(|| Target::Display(targets::get_main_display().unwrap()));
 
     let sc_shareable_content = SCShareableContent::current();
 
-    let params = match target {
+    let params = match &target {
         Target::Window(window) => {
             // Get SCWindow from window id
             let sc_window = sc_shareable_content
@@ -167,7 +167,7 @@ pub fn get_output_frame_size(options: &Options) -> [u32; 2] {
     let target = options
         .target
         .clone()
-        .unwrap_or_else(|| Target::Display(targets::get_main_display()));
+        .unwrap_or_else(|| Target::Display(targets::get_main_display().unwrap()));
 
     let scale_factor = targets::get_scale_factor(&target);
     let source_rect = get_crop_area(options);
@@ -199,7 +199,7 @@ pub fn get_crop_area(options: &Options) -> Area {
     let target = options
         .target
         .clone()
-        .unwrap_or_else(|| Target::Display(targets::get_main_display()));
+        .unwrap_or_else(|| Target::Display(targets::get_main_display().unwrap()));
 
     let (width, height) = targets::get_target_dimensions(&target);
 
